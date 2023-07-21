@@ -1,0 +1,49 @@
+{
+  "name": "@quickagency/firebase-extensions",
+  "version": "0.0.0",
+  "description": "Quick Agency repo of Firebase extensions",
+  "main": "none",
+  "scripts": {
+    "format": "prettier --write \"**/*.{js,md,yml,ts,json,yaml}\"",
+    "lint": "prettier --list-different \"**/*.{js,md,yml,ts,json,yaml}\"",
+    "build": "npm-run-all --parallel build:*",
+    "build:firestore-d13n": "cd firestore-d13n/functions && npm run build",
+    "local:emulator": "cd _emulator && firebase emulators:start -P demo-test",
+    "test": "npm run build && cd _emulator && firebase emulators:exec jest -P demo-test",
+    "test:ci": "npm run build && cd _emulator && firebase emulators:exec \"jest --detectOpenHandles --forceExit\" -P demo-test",
+    "postinstall": "npm-run-all --parallel install:*",
+    "install:firestore-d13n": "cd firestore-d13n/functions && npm install",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.3",
+    "husky": "^8.0.0",
+    "jest": "^29.6.1",
+    "lerna": "^7.1.4",
+    "lint-staged": "^13.2.3",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.1.6"
+  },
+  "prettier": {
+    "singleQuote": false
+  },
+  "lint-staged": {
+    "*.{js,md,yml,ts,json,yaml}": "prettier --write"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Quick-Agency/firebase-extensions.git"
+  },
+  "keywords": [
+    "firebase",
+    "extensions"
+  ],
+  "author": "Maxence Perrin",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Quick-Agency/firebase-extensions/issues"
+  },
+  "homepage": "https://github.com/Quick-Agency/firebase-extensions#readme"
+}
