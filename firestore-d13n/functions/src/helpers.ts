@@ -55,6 +55,36 @@ export const updateObject = async (after: DocumentSnapshot) => {
     const bulk = firestore.bulkWriter();
 
     let count = 0;
+    let next: any | undefined = undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    // Use denormalize function if provided, otherwise next value will be compute with each target document previous value
+    if (config.sourceDenormalizeFunctionName) {
+      const url = process.env.FIREBASE_EMULATOR_HUB
+        ? `http://127.0.0.1:5001/${config.projectId}/${config.location}/${config.sourceDenormalizeFunctionName}`
+        : `https://${config.location}-${config.projectId}.cloudfunctions.net/${config.sourceDenormalizeFunctionName}`;
+      const res = await fetch(url, {
+        headers: {
+          ["Content-Type"]: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({ data: { id: after.id, ...after.data() } }),
+      });
+      if (
+        res.ok &&
+        res.headers.get("content-type")?.includes("application/json")
+      ) {
+        const json = await res.json();
+        next = json.result;
+      } else {
+        log.denormalizeFunctionFailed(
+          url,
+          res.status,
+          res.statusText,
+          res.headers,
+        );
+        throw new Error("Denormalize function failed");
+      }
+    }
 
     for (const [index, query] of queries.entries()) {
       const targetDocumentField = config.targetDocumentFields[index];
@@ -72,15 +102,17 @@ export const updateObject = async (after: DocumentSnapshot) => {
           return;
         }
 
-        // Replace previous value by after values except for the trigger doc id
+        // If no transform function is provided, replace previous value by after values except for the trigger doc id
         // If the trigger doc do not have a field, keep the previous value
-        const next = Object.fromEntries(
-          Object.entries(prev).map(([key, prevValue]) =>
-            prevValue === after.id
-              ? [key, after.id]
-              : [key, after.get(key) || prevValue],
-          ),
-        );
+        if (next === undefined) {
+          next = Object.fromEntries(
+            Object.entries(prev).map(([key, prevValue]) =>
+              prevValue === after.id
+                ? [key, after.id]
+                : [key, after.get(key) || prevValue],
+            ),
+          );
+        }
 
         bulk.update(doc.ref, {
           [parentPath]: next,

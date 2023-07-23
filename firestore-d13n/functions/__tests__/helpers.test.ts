@@ -8,7 +8,10 @@ import {
   batchUpdate,
   targetFieldPathToParentPathAndSegment,
   fieldPathsChanged,
+  updateObject,
 } from "../src/helpers";
+import { getConfigFromEnv } from "./utils";
+import { mock } from "node:test";
 
 // Mock config module to override environment variables and avoid conflict with e2e tests
 jest.mock("../src/config", () => ({
@@ -16,19 +19,32 @@ jest.mock("../src/config", () => ({
   default: null,
 }));
 
-const consoleLogSpy = jest
+// Mock logs module to validate logs and avoid logging in tests
+const configInvalidLogSpy = jest
+  .spyOn(logs, "configInvalid")
+  .mockImplementation();
+const sourceDocumentFieldChangedLogSpy = jest
   .spyOn(logs, "sourceDocumentFieldChanged")
+  .mockImplementation();
+const updateCompletedLogSpy = jest
+  .spyOn(logs, "updateCompleted")
   .mockImplementation();
 
 if (getApps().length === 0) {
   initializeApp();
 }
 
+// Clear all mock before each test
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
 describe("targetFieldPathToParentPathAndSegment helper functions", () => {
   it("should throw if less than two segment", () => {
     expect(() => {
       targetFieldPathToParentPathAndSegment("a");
     }).toThrow();
+    expect(configInvalidLogSpy).toHaveBeenCalled();
   });
 
   it("should return the parent path and segment path", () => {
@@ -44,7 +60,7 @@ describe("targetFieldPathToParentPathAndSegment helper functions", () => {
   });
 });
 
-describe.only("fieldPathsChanged helper functins", () => {
+describe("fieldPathsChanged helper functins", () => {
   // Mock the change object
   const changeMockFactory = (
     beforeData: Record<string, unknown>,
@@ -61,22 +77,7 @@ describe.only("fieldPathsChanged helper functins", () => {
 
   beforeAll(() => {
     // @ts-ignore override mocked config with default values because this suite do not interact with firestore
-    config = {
-      location: process.env.LOCATION as string,
-      sourceCollectionName: process.env.SOURCE_COLLECTION_NAME as string,
-      sourceDocumentFields: process.env.SOURCE_DOCUMENT_FIELDS?.split(
-        ",",
-      ) as string[],
-      targetCollectionNames: process.env.TARGET_COLLECTION_NAMES?.split(
-        ",",
-      ) as string[],
-      targetDocumentFields: process.env.TARGET_DOCUMENT_FIELDS?.split(
-        ",",
-      ) as string[],
-      doBackfill: process.env.DO_BACKFILL === "true",
-      docIdWildcard: "{docId}",
-      batchUpdateLimit: 10,
-    };
+    config = getConfigFromEnv();
   });
 
   it("should return false if no fields changed", () => {
@@ -107,9 +108,136 @@ describe.only("fieldPathsChanged helper functins", () => {
     const result = fieldPathsChanged(changeMockFactory(beforeData, afterData));
 
     expect(result).toBeTruthy();
-    expect(consoleLogSpy).toHaveBeenCalledWith({
+    expect(sourceDocumentFieldChangedLogSpy).toHaveBeenCalledWith({
       lastname: { before: "Doe", after: "Smith" },
     });
+  });
+});
+
+describe("updateObject helper functions", () => {
+  const db = getFirestore();
+
+  beforeAll(() => {
+    // @ts-ignore override mocked config with default values because this suite do not interact with firestore
+    config = {
+      ...getConfigFromEnv(),
+      sourceCollectionName: "firestore-d13n-helpers-updateObject-sources",
+      targetCollectionNames: ["firestore-d13n-helpers-updateObject-targets"],
+      sourceDenormalizeFunctionName: undefined,
+      targetDocumentFields: ["user.id"],
+    };
+  });
+
+  afterAll(async () => {
+    // Clean up all documents
+    await Promise.all([
+      db.recursiveDelete(db.collection(config.sourceCollectionName)),
+    ]);
+  });
+
+  it("should update target documents", async () => {
+    const beforeData = {
+      firstname: "John",
+      lastname: "Doe",
+    };
+    const afterData = {
+      firstname: "Jane",
+      lastname: "Doe",
+    };
+    // Setup source document wiht after data as it will be passed to the updateObject function
+    const sourceRef = db.collection(config.sourceCollectionName).doc();
+    await sourceRef.set(afterData);
+    const sourceSnapshot = await sourceRef.get();
+
+    // Setup target document with before data
+    const targetRef = db.collection(config.targetCollectionNames[0]).doc();
+    await targetRef.set({
+      user: {
+        id: sourceRef.id,
+        ...beforeData,
+        someOtherData: true,
+      },
+    });
+
+    await updateObject(sourceSnapshot);
+
+    const targetSnapshot = await targetRef.get();
+
+    expect(targetSnapshot.data()?.user.firstname).toEqual(afterData.firstname);
+    expect(targetSnapshot.data()?.user.someOtherData).toEqual(true);
+    expect(updateCompletedLogSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("updateObject helper functions with user provided source denormalize function", () => {
+  const db = getFirestore();
+  const mockFetch = jest.fn();
+
+  // @ts-ignore override mocked fetch function
+  mock.method(global, "fetch", mockFetch);
+
+  beforeAll(() => {
+    // @ts-ignore override mocked config with default values because this suite do not interact with firestore
+    config = {
+      ...getConfigFromEnv(),
+      sourceCollectionName: "firestore-d13n-helpers-updateObject-sources",
+      targetCollectionNames: ["firestore-d13n-helpers-updateObject-targets"],
+      sourceDenormalizeFunctionName: "denormalizeUser",
+      targetDocumentFields: ["user.id"],
+    };
+  });
+
+  afterAll(async () => {
+    // Clean up all documents
+    await Promise.all([
+      db.recursiveDelete(db.collection(config.sourceCollectionName)),
+    ]);
+  });
+
+  it("should update target documents", async () => {
+    const beforeData = {
+      firstname: "John",
+      lastname: "Doe",
+    };
+    const afterData = {
+      firstname: "Jane",
+      lastname: "Doe",
+    };
+    const denormalizeUser = jest.fn().mockImplementation((data) => data);
+    // Setup source document wiht after data as it will be passed to the updateObject function
+    const sourceRef = db.collection(config.sourceCollectionName).doc();
+    await sourceRef.set(afterData);
+    const sourceSnapshot = await sourceRef.get();
+
+    // Setup target document with before data
+    const targetRef = db.collection(config.targetCollectionNames[0]).doc();
+    await targetRef.set({
+      user: {
+        id: sourceRef.id,
+        ...denormalizeUser(beforeData),
+      },
+    });
+
+    mockFetch.mockImplementation(() => ({
+      status: 200,
+      ok: true,
+      headers: {
+        get: jest.fn().mockImplementation(() => "application/json"),
+      },
+      json: async () => ({
+        result: { ...afterData, id: sourceRef.id, customData: true },
+      }),
+    }));
+
+    await updateObject(sourceSnapshot);
+
+    const targetSnapshot = await targetRef.get();
+
+    expect(targetSnapshot.data()?.user.firstname).toEqual(afterData.firstname);
+    // Custome data should be left untouched
+    console.log(targetSnapshot.data());
+    expect(targetSnapshot.data()?.user.customData).toEqual(true);
+    expect(updateCompletedLogSpy).toHaveBeenCalledWith(1);
   });
 });
 
@@ -121,22 +249,13 @@ describe("batchUpdate helper functions", () => {
   beforeAll(() => {
     // @ts-ignore override mocked config
     config = {
-      location: process.env.LOCATION as string,
+      ...getConfigFromEnv(),
       sourceCollectionName: "firestore-d13n-helpers-batchUpdate-sources",
-      sourceDocumentFields: process.env.SOURCE_DOCUMENT_FIELDS?.split(
-        ",",
-      ) as string[],
       targetCollectionNames: ["firestore-d13n-helpers-batchUpdate-targets"],
-      targetDocumentFields: process.env.TARGET_DOCUMENT_FIELDS?.split(
-        ",",
-      ) as string[],
-      doBackfill: process.env.DO_BACKFILL === "true",
-      docIdWildcard: "{docId}",
-      batchUpdateLimit: 10,
     };
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     // Clean up all documents
     await Promise.all([
       db.recursiveDelete(db.collection(config.sourceCollectionName)),
@@ -175,5 +294,8 @@ describe("batchUpdate helper functions", () => {
     expect(thirdBatchUpdate.done).toBeTruthy();
     expect(thirdBatchUpdate.sourceDocs).toEqual(sourceDocRefs.length);
     expect(thirdBatchUpdate.startAfterDocId).toBeUndefined();
+    expect(updateCompletedLogSpy).toHaveBeenCalledTimes(
+      config.batchUpdateLimit + 1,
+    );
   });
 });

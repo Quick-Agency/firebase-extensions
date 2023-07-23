@@ -48,3 +48,16 @@ export const backFillSourceCollectionCompleted = (
 
 export const backFillSourceCollectionFailed = (reason: string) =>
   logger.error(reason, { config });
+
+export const denormalizeFunctionFailed = (
+  url: string,
+  status: number,
+  statusText: string,
+  headers: Headers,
+) =>
+  logger.error("Denormalize function failed", {
+    url,
+    status,
+    statusText,
+    headers,
+  });

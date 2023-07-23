@@ -14,7 +14,8 @@
     "test:ci": "npm run build && cd _emulator && firebase emulators:exec \"jest --detectOpenHandles --forceExit\" -P demo-test",
     "postinstall": "npm-run-all --parallel install:*",
     "install:firestore-d13n": "cd firestore-d13n/functions && npm install",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "testversion": "node --version"
   },
   "devDependencies": {
     "@types/jest": "^29.5.3",
@@ -46,5 +47,8 @@
   "bugs": {
     "url": "https://github.com/Quick-Agency/firebase-extensions/issues"
   },
-  "homepage": "https://github.com/Quick-Agency/firebase-extensions#readme"
+  "homepage": "https://github.com/Quick-Agency/firebase-extensions#readme",
+  "engines": {
+    "node": ">=18"
+  }
 }

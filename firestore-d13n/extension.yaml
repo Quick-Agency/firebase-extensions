@@ -145,6 +145,14 @@ params:
     default: firstname,lastname
     required: true
 
+  - param: SOURCE_DENORMALIZE_FUNCTION_NAME
+    label: Pre-processing callable function name
+    description: >-
+      An optionnal HTTPS callable function that will be called to transform the source document data before it is updated in the target document.
+    type: string
+    example: denormalizeUser
+    required: false
+
   - param: TARGET_COLLECTION_NAMES
     label: Target collection names
     description: >-
