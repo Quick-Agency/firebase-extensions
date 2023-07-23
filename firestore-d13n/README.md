@@ -1,6 +1,6 @@
 # Quick Agency firestore-d13n
 
-**Author**: undefined 
+**Author**: Quick Agency (**[https://quick.agency](https://quick.agency)**)
 
 **Description**: Automate your denormalization updates across all your collections in Firestore.
 
