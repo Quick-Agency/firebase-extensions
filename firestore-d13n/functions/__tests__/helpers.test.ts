@@ -1,10 +1,13 @@
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, DocumentReference } from "firebase-admin/firestore";
-// import { Config } from "../src/types";
+import { type Change } from "firebase-functions";
+import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import config from "../src/config";
+import * as logs from "../src/logs";
 import {
   batchUpdate,
   targetFieldPathToParentPathAndSegment,
+  fieldPathsChanged,
 } from "../src/helpers";
 
 // Mock config module to override environment variables and avoid conflict with e2e tests
@@ -12,6 +15,10 @@ jest.mock("../src/config", () => ({
   __esModule: true,
   default: null,
 }));
+
+const consoleLogSpy = jest
+  .spyOn(logs, "sourceDocumentFieldChanged")
+  .mockImplementation();
 
 if (getApps().length === 0) {
   initializeApp();
@@ -37,32 +44,82 @@ describe("targetFieldPathToParentPathAndSegment helper functions", () => {
   });
 });
 
+describe.only("fieldPathsChanged helper functins", () => {
+  // Mock the change object
+  const changeMockFactory = (
+    beforeData: Record<string, unknown>,
+    afterData: Record<string, unknown>,
+  ) =>
+    ({
+      before: {
+        get: jest.fn().mockImplementation((path: string) => beforeData[path]),
+      },
+      after: {
+        get: jest.fn().mockImplementation((path: string) => afterData[path]),
+      },
+    }) as unknown as Change<QueryDocumentSnapshot>;
+
+  beforeAll(() => {
+    // @ts-ignore override mocked config with default values because this suite do not interact with firestore
+    config = {
+      location: process.env.LOCATION as string,
+      sourceCollectionName: process.env.SOURCE_COLLECTION_NAME as string,
+      sourceDocumentFields: process.env.SOURCE_DOCUMENT_FIELDS?.split(
+        ",",
+      ) as string[],
+      targetCollectionNames: process.env.TARGET_COLLECTION_NAMES?.split(
+        ",",
+      ) as string[],
+      targetDocumentFields: process.env.TARGET_DOCUMENT_FIELDS?.split(
+        ",",
+      ) as string[],
+      doBackfill: process.env.DO_BACKFILL === "true",
+      docIdWildcard: "{docId}",
+      batchUpdateLimit: 10,
+    };
+  });
+
+  it("should return false if no fields changed", () => {
+    const beforeData = {
+      firstname: "John",
+      lastname: "Doe",
+    };
+    const afterData = {
+      firstname: "John",
+      lastname: "Doe",
+    };
+
+    const result = fieldPathsChanged(changeMockFactory(beforeData, afterData));
+
+    expect(result).toBeFalsy();
+  });
+
+  it("should return true if fields changed and logged change path", () => {
+    const beforeData = {
+      firstname: "John",
+      lastname: "Doe",
+    };
+    const afterData = {
+      firstname: "John",
+      lastname: "Smith",
+    };
+
+    const result = fieldPathsChanged(changeMockFactory(beforeData, afterData));
+
+    expect(result).toBeTruthy();
+    expect(consoleLogSpy).toHaveBeenCalledWith({
+      lastname: { before: "Doe", after: "Smith" },
+    });
+  });
+});
+
 describe("batchUpdate helper functions", () => {
   const db = getFirestore();
-
-  // let config: Config;
 
   const sourceDocRefs: DocumentReference[] = [];
 
   beforeAll(() => {
-    // Config must be initialized in the describe function to access process.env variables setup in hook.ts
-    // config = {
-    //   location: process.env.LOCATION as string,
-    //   sourceCollectionName: process.env.SOURCE_COLLECTION_NAME as string,
-    //   sourceDocumentFields: process.env.SOURCE_DOCUMENT_FIELDS?.split(
-    //     ",",
-    //   ) as string[],
-    //   targetCollectionNames: process.env.TARGET_COLLECTION_NAMES?.split(
-    //     ",",
-    //   ) as string[],
-    //   targetDocumentFields: process.env.TARGET_DOCUMENT_FIELDS?.split(
-    //     ",",
-    //   ) as string[],
-    //   doBackfill: process.env.DO_BACKFILL === "true",
-    //   docIdWildcard: "{docId}",
-    //   batchUpdateLimit: 10,
-    // };
-    // @ts-ignore
+    // @ts-ignore override mocked config
     config = {
       location: process.env.LOCATION as string,
       sourceCollectionName: "firestore-d13n-helpers-batchUpdate-sources",
