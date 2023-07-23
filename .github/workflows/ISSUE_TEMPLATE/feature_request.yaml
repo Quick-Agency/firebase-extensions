@@ -1,0 +1,59 @@
+name: Bug report
+description: Something is missing ?
+title: "[Feature]: "
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: "##Feature Request"
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: This project has a Code of Conduct that all participants are expected to understand and follow.
+      options:
+        - label: I have read and agree to the Quick Agency Firebase Extensions project's [Code of Conduct](https://github.com/Quick-Agency/firebase-extensions/blob/main/CODE_OF_CONDUCT.md)
+          required: true
+
+  - type: dropdown
+    id: extension
+    attributes:
+      label: Extension
+      description: What extension is concerned?
+      options:
+        - firestore-d13n
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: A concise description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Use case Example
+      description: A concise example of this feature use case.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Possible solution
+      description: A concise description of a possible solution.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Anything else?
+      description: |
+        Links? References? Anything that will give us more context about the issue you are encountering!
+
+        Tip: You can attach images or log files by clicking this area to highlight it and then dragging files in.
+    validations:
+      required: false
