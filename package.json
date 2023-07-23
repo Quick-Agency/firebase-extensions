@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "description": "Quick Agency repo of Firebase extensions",
   "main": "none",
+  "private": true,
   "scripts": {
     "format": "prettier --write \"**/*.{js,md,yml,ts,json,yaml}\"",
     "lint": "prettier --list-different \"**/*.{js,md,yml,ts,json,yaml}\"",
