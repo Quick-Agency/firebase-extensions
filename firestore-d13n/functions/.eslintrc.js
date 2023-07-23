@@ -26,5 +26,15 @@ module.exports = {
   rules: {
     quotes: ["error", "double"],
     "import/no-unresolved": 0,
+    "@typescript-eslint/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "ts-ignore": "allow-with-description",
+        "ts-nocheck": "allow-with-description",
+        "ts-check": "allow-with-description",
+        minimumDescriptionLength: 3,
+      },
+    ],
   },
 };
