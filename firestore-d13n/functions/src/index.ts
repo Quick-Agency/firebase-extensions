@@ -11,10 +11,10 @@ export const onUpdate = functions
   .onUpdate(async (change) => {
     if (fieldPathsChanged(change)) {
       const collectionNames = config.targetCollectionNames;
-      const sourceDocumentFields = config.sourceDocumentFields;
+      const targetDocumentFields = config.targetDocumentFields;
 
-      if (collectionNames.length !== sourceDocumentFields.length) {
-        const errMsg = `Collection names (${collectionNames.length} elements) and target field paths (${sourceDocumentFields.length} elements) must have the same number of elements`;
+      if (collectionNames.length !== targetDocumentFields.length) {
+        const errMsg = `Collection names (${collectionNames.length} elements) and target field paths (${targetDocumentFields.length} elements) must have the same number of elements`;
         log.configInvalid(errMsg);
         throw new Error(errMsg);
       }
