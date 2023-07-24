@@ -68,7 +68,9 @@ export const updateObject = async (after: DocumentSnapshot) => {
           ["Content-Type"]: "application/json",
         },
         method: "POST",
-        body: JSON.stringify({ data: { id: after.id, ...after.data() } }),
+        body: JSON.stringify({
+          data: { docId: after.id, docPath: after.ref.path, ...after.data() },
+        }),
       };
 
       // fetch callable fuction and catch fetch error
@@ -92,7 +94,7 @@ export const updateObject = async (after: DocumentSnapshot) => {
       }
 
       const json = await res.json();
-      next = json.result;
+      next = { ...json.result, id: after.id };
     }
 
     for (const [index, query] of queries.entries()) {

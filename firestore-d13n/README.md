@@ -10,9 +10,10 @@
 
 The extension listens for update on specific fields of the source collection documents and will find any target document matching the source document id to update the denormalized data.
 
-Target document will be query based on field path matching the source document id, for example `user.id`. Target field path also support dynamic segment that will be replace by the source document id, for example `speakers.{docId}.userId`. This allow for multiple use cases:
+
+#### Target document
+Target document will be query based on field path matching the source document id, for example `user.id`. 
 ```json
-// Attendee document linked to one and only one user, target path : 'user.id'
 {
   "event": "Event name",
   "user":{
@@ -21,8 +22,10 @@ Target document will be query based on field path matching the source document i
     "lastname": "Doe"
   }
 }
+```
 
-// Confernce document linked to one or more user, target path : 'speakers.{docId}.userId'
+Target field path also support dynamic segment that will be replace by the source document id, for example `speakers.{docId}.userId`. This allow for more complex use cases
+```json
 {
   "name": "Conference name",
   "speakers":{
@@ -40,6 +43,63 @@ Target document will be query based on field path matching the source document i
 }
 ```
 
+#### Denormalize data
+By default the denormalize data will be updated in respect of the object found in the given fieldpath. Any key in the object that exist on the source document will be updated with the last value.
+
+```json
+// Source document for a user
+{
+  "firstname": "John",
+  "lastname": "Doe",
+  "email": "john.doe@mail.com",
+  "details": {
+    "mobile": "1234567890"
+  }
+}
+```
+
+
+```json
+// Target document for an attendee to an event
+{
+  "event": "Event name",
+  "user":{
+    "id": "NWxhvUgr5jFhljIWnlI3",
+    "firstname": "John", // Will be updated with new value
+    "lastname": "Doe", // Will be updated with new value
+    "type": "vip" // Will remain untouched
+  }
+}
+```
+
+#### Custom logic for denormalize data
+An optional denormalize function name can be passed in the configuration. This function name must refer to a deployed [https callable function](https://firebase.google.com/docs/functions/callable?gen=1st) (1st generation) and will be called with the new data from the source document and return the denormalize data. In this case the object found in the matching fieldpath is replace with return value.
+
+**A https callable function to denormalize user data**
+```typescript
+export const denormalizeUser = functions
+  .https.onCall((data) => {
+    // data include a docId and docPath that can be use for custom logic
+    return {
+      firstname: data.firstname,
+      lastname: data.lastname,
+      mobile: data.details?.mobile,
+    };
+  });
+```
+
+**The resulting target document**
+```json
+{
+  "event": "Event name",
+  "user":{
+    "id": "NWxhvUgr5jFhljIWnlI3",
+    "firstname": "John", 
+    "lastname": "Doe", 
+    "mobile": "1234567890" 
+  }
+}
+```
 
 #### Important
 
@@ -107,6 +167,8 @@ When you use Firebase Extensions, you're only charged for the underlying resourc
 * Source collection name: The source collection name to listen for document update
 
 * Source document fields: A comma separated list of field paths on the source document that will trigger the update of denormalized data in the target collections
+
+* Denormalize function name: An optionnal HTTPS callable function that will be called to transform the source document data before it is updated in the target document.
 
 * Target collection names: A comma separated list of collection names of document where the denormalized data will be updated This collection names will be used in collection group query, not as path
 
