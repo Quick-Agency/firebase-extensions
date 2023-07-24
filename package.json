@@ -14,7 +14,7 @@
     "test:ci": "npm run build && cd _emulator && firebase emulators:exec \"jest --detectOpenHandles --forceExit\" -P demo-test",
     "postinstall": "npm-run-all --parallel install:*",
     "install:firestore-d13n": "cd firestore-d13n/functions && npm install",
-    "install:emulator": "cd _emulator && npm install",
+    "install:emulator": "cd _emulator/functions && npm install",
     "prepare": "husky install",
     "testversion": "node --version"
   },
