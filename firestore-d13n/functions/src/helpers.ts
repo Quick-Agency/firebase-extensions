@@ -94,12 +94,12 @@ export const updateObject = async (after: DocumentSnapshot) => {
       }
 
       const json = await res.json();
-      next = { ...json.result, id: after.id };
+      next = json.result;
     }
 
     for (const [index, query] of queries.entries()) {
       const targetDocumentField = config.targetDocumentFields[index];
-      const [genericParentPath] =
+      const [genericParentPath, lastSegmentPath] =
         targetFieldPathToParentPathAndSegment(targetDocumentField);
       const parentPath = genericParentPath.replace(
         config.docIdWildcard,
@@ -123,6 +123,9 @@ export const updateObject = async (after: DocumentSnapshot) => {
                 : [key, after.get(key) || prevValue],
             ),
           );
+        } else {
+          // Add the use for matching id in case the user provided denormalize function does not return it
+          next[lastSegmentPath] = after.id;
         }
 
         bulk.update(doc.ref, {

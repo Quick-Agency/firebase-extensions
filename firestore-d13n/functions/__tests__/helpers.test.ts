@@ -225,7 +225,7 @@ describe("updateObject helper functions with user provided source denormalize fu
         get: jest.fn().mockImplementation(() => "application/json"),
       },
       json: async () => ({
-        result: { ...afterData, id: sourceRef.id, customData: true },
+        result: { ...afterData, customData: true },
       }),
       catch: mockFetch, // Return the same mock to avoid error on use case as fetch(...).catch(...)
     }));
@@ -234,10 +234,23 @@ describe("updateObject helper functions with user provided source denormalize fu
 
     const targetSnapshot = await targetRef.get();
 
+    // Denormalize function should be called with the right arguments
+    const fetchMockFirstCall = mockFetch.mock.calls[0];
+    const [url, init] = fetchMockFirstCall;
+    const body = JSON.parse(init.body);
+    expect(url.includes(config.sourceDenormalizeFunctionName)).toBeTruthy();
+    expect(init.method).toEqual("POST");
+    expect(init.headers).toEqual({ ["Content-Type"]: "application/json" });
+    expect(body).toHaveProperty("data");
+    expect(body.data).toHaveProperty("docId", sourceRef.id);
+    expect(body.data).toHaveProperty("docPath", sourceRef.path);
+
+    // Target document should be updated with the denormalized data
     expect(targetSnapshot.data()?.user.firstname).toEqual(afterData.firstname);
-    // Custome data should be left untouched
-    console.log(targetSnapshot.data());
     expect(targetSnapshot.data()?.user.customData).toEqual(true);
+    expect(targetSnapshot.data()?.user.id).toEqual(sourceRef.id);
+
+    // Update completed log should be called
     expect(updateCompletedLogSpy).toHaveBeenCalledWith(1);
   });
 });
