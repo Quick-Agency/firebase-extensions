@@ -227,6 +227,7 @@ describe("updateObject helper functions with user provided source denormalize fu
       json: async () => ({
         result: { ...afterData, id: sourceRef.id, customData: true },
       }),
+      catch: mockFetch, // Return the same mock to avoid error on use case as fetch(...).catch(...)
     }));
 
     await updateObject(sourceSnapshot);

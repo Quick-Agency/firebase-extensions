@@ -49,6 +49,9 @@ export const backFillSourceCollectionCompleted = (
 export const backFillSourceCollectionFailed = (reason: string) =>
   logger.error(reason, { config });
 
+export const fetchDenormalizeFunctionFailed = (url: string, error: unknown) =>
+  logger.error("Fetch denormalize function failed", { url, error });
+
 export const denormalizeFunctionFailed = (
   url: string,
   status: number,

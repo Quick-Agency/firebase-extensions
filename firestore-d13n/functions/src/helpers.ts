@@ -57,25 +57,31 @@ export const updateObject = async (after: DocumentSnapshot) => {
     let count = 0;
     let next: any | undefined = undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    // Use denormalize function if provided, otherwise next value will be compute with each target document previous value
+    // Use denormalize function if provided, otherwise next value will be compute based on target document previous value
     if (config.sourceDenormalizeFunctionName) {
       const url = process.env.FIREBASE_EMULATOR_HUB
         ? `http://127.0.0.1:5001/${config.projectId}/${config.location}/${config.sourceDenormalizeFunctionName}`
         : `https://${config.location}-${config.projectId}.cloudfunctions.net/${config.sourceDenormalizeFunctionName}`;
-      const res = await fetch(url, {
+
+      const init: RequestInit = {
         headers: {
           ["Content-Type"]: "application/json",
         },
         method: "POST",
         body: JSON.stringify({ data: { id: after.id, ...after.data() } }),
+      };
+
+      // fetch callable fuction and catch fetch error
+      const res = await fetch(url, init).catch((error) => {
+        log.fetchDenormalizeFunctionFailed(url, error);
+        throw new Error("Fetch denormalize function failed");
       });
+
+      // Throw error if response is not ok or not json
       if (
-        res.ok &&
-        res.headers.get("content-type")?.includes("application/json")
+        !res.ok ||
+        !res.headers.get("content-type")?.includes("application/json")
       ) {
-        const json = await res.json();
-        next = json.result;
-      } else {
         log.denormalizeFunctionFailed(
           url,
           res.status,
@@ -84,6 +90,9 @@ export const updateObject = async (after: DocumentSnapshot) => {
         );
         throw new Error("Denormalize function failed");
       }
+
+      const json = await res.json();
+      next = json.result;
     }
 
     for (const [index, query] of queries.entries()) {
