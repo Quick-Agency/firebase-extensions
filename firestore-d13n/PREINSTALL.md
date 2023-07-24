@@ -65,7 +65,12 @@ By default the denormalize data will be updated in respect of the object found i
 ```
 
 #### Custom logic for denormalize data
-An optional denormalize function name can be passed in the configuration. This function name must refer to a deployed [https callable function](https://firebase.google.com/docs/functions/callable?gen=1st) (1st generation) and will be called with the new data from the source document and return the denormalize data. In this case the object found in the matching fieldpath is replace with return value.
+An optional denormalize function name can be passed in the configuration. This function must :
+- be an [https callable function](https://firebase.google.com/docs/functions/callable?gen=1st) (1st generation)
+- be deployed on the same region as the firebae extension
+- return the denormalized data
+
+In this case the object found in the matching fieldpath is replace with return value.
 
 **A https callable function to denormalize user data**
 ```typescript
