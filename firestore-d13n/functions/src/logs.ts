@@ -64,3 +64,11 @@ export const denormalizeFunctionFailed = (
     statusText,
     headers,
   });
+
+export const targetCollectionQueryiesFailed = (
+  errors: { reason: any; targetCollectionName: string; fieldPath: string }[], // eslint-disable-line @typescript-eslint/no-explicit-any
+) =>
+  logger.error(
+    "Target collection queries failed, check for missing index exempltion in the errors",
+    { errors },
+  );

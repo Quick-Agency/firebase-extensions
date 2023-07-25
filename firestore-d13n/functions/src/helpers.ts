@@ -1,38 +1,14 @@
 import config from "./config";
 import * as log from "./logs";
 import { firestore } from "./firebase";
-import { Change } from "firebase-functions";
-import {
-  QueryDocumentSnapshot,
-  DocumentSnapshot,
-} from "firebase-admin/firestore";
-
-export const fieldPathsChanged = (change: Change<QueryDocumentSnapshot>) => {
-  const before = change.before;
-  const after = change.after;
-
-  const changedPaths = config.sourceDocumentFields.filter(
-    (path) =>
-      JSON.stringify(before.get(path)) !== JSON.stringify(after.get(path)),
-  );
-
-  if (changedPaths.length > 0)
-    log.sourceDocumentFieldChanged(
-      Object.fromEntries(
-        changedPaths.map((path) => [
-          path,
-          { before: before.get(path), after: after.get(path) },
-        ]),
-      ),
-    );
-
-  return changedPaths.length > 0;
-};
+import { DocumentSnapshot } from "firebase-admin/firestore";
+import { targetFieldPathToParentPathAndSegment } from "./utils";
 
 export const updateObject = async (after: DocumentSnapshot) => {
   try {
     const rootCollections = await firestore.listCollections();
-    const queries = await Promise.all(
+
+    const queries = await Promise.allSettled(
       config.targetCollectionNames.map((collectionName, index) => {
         const targetDocumentField = config.targetDocumentFields[index];
 
@@ -43,6 +19,7 @@ export const updateObject = async (after: DocumentSnapshot) => {
           ) > -1
             ? firestore.collection(collectionName)
             : firestore.collectionGroup(collectionName);
+
         return collectionRef
           .where(
             targetDocumentField.replace(config.docIdWildcard, after.id),
@@ -52,6 +29,25 @@ export const updateObject = async (after: DocumentSnapshot) => {
           .get();
       }),
     );
+
+    // Throw error if any query failed
+    const queriesError: Parameters<
+      typeof log.targetCollectionQueryiesFailed
+    >[0] = [];
+    for (const [index, result] of queries.entries()) {
+      if (result.status === "rejected") {
+        queriesError.push({
+          reason: result.reason,
+          targetCollectionName: config.targetCollectionNames[index],
+          fieldPath: config.targetDocumentFields[index],
+        });
+      }
+    }
+    if (queriesError.length > 0) {
+      log.targetCollectionQueryiesFailed(queriesError);
+      throw new Error("Target collection queries failed");
+    }
+
     const bulk = firestore.bulkWriter();
 
     let count = 0;
@@ -106,7 +102,12 @@ export const updateObject = async (after: DocumentSnapshot) => {
         after.id,
       );
 
-      query.docs.forEach((doc) => {
+      // All queries should be fulfilled has we checked for errors above
+      if (query.status === "rejected") {
+        continue;
+      }
+
+      query.value.docs.forEach((doc) => {
         const prev = doc.get(parentPath);
         if (typeof prev !== "object" || prev === null) {
           log.previousValueInvalid(doc.id, doc.data());
@@ -146,19 +147,6 @@ export const updateObject = async (after: DocumentSnapshot) => {
     );
     throw error;
   }
-};
-
-export const targetFieldPathToParentPathAndSegment = (path: string) => {
-  const segments = path.split(".");
-  const parentPath = segments.slice(0, -1).join(".");
-  const lastSegment = segments.at(-1);
-  if (segments.length < 2 || !lastSegment) {
-    const reason = `Target field path ${path} should have at least two segments delimited by a '.'`;
-    log.configInvalid(reason);
-    throw new Error(reason);
-  }
-
-  return [parentPath, lastSegment];
 };
 
 export const batchUpdate = async ({

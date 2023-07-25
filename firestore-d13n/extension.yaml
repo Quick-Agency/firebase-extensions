@@ -2,7 +2,7 @@ name: firestore-d13n
 version: 0.0.1
 specVersion: v1beta
 
-displayName: Quick Agency firestore-d13n
+displayName: Firstore Denormalization
 
 description: >-
   Automate your denormalization updates across all your collections in Firestore.
