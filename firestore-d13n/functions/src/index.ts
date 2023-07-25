@@ -3,7 +3,8 @@ import { getFunctions } from "firebase-admin/functions";
 import { getExtensions } from "firebase-admin/extensions";
 import config from "./config";
 import * as log from "./logs";
-import { batchUpdate, fieldPathsChanged, updateObject } from "./helpers";
+import { batchUpdate, updateObject } from "./helpers";
+import { fieldPathsChanged } from "./utils";
 
 export const onUpdate = functions
   .region(config.location)

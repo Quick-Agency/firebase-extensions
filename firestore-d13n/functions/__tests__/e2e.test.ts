@@ -1,8 +1,8 @@
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, DocumentReference } from "firebase-admin/firestore";
 import { Config } from "../src/types";
-import { targetFieldPathToParentPathAndSegment } from "../src/helpers";
 import { getConfigFromEnv } from "./utils";
+import { targetFieldPathToParentPathAndSegment } from "../src/utils";
 
 if (getApps().length === 0) {
   initializeApp();

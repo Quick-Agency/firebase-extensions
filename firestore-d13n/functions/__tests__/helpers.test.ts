@@ -1,15 +1,8 @@
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, DocumentReference } from "firebase-admin/firestore";
-import { type Change } from "firebase-functions";
-import type { QueryDocumentSnapshot } from "firebase-admin/firestore";
 import config from "../src/config";
 import * as logs from "../src/logs";
-import {
-  batchUpdate,
-  targetFieldPathToParentPathAndSegment,
-  fieldPathsChanged,
-  updateObject,
-} from "../src/helpers";
+import { batchUpdate, updateObject } from "../src/helpers";
 import { getConfigFromEnv } from "./utils";
 import { mock } from "node:test";
 
@@ -20,12 +13,6 @@ jest.mock("../src/config", () => ({
 }));
 
 // Mock logs module to validate logs and avoid logging in tests
-const configInvalidLogSpy = jest
-  .spyOn(logs, "configInvalid")
-  .mockImplementation();
-const sourceDocumentFieldChangedLogSpy = jest
-  .spyOn(logs, "sourceDocumentFieldChanged")
-  .mockImplementation();
 const updateCompletedLogSpy = jest
   .spyOn(logs, "updateCompleted")
   .mockImplementation();
@@ -37,81 +24,6 @@ if (getApps().length === 0) {
 // Clear all mock before each test
 beforeEach(() => {
   jest.clearAllMocks();
-});
-
-describe("targetFieldPathToParentPathAndSegment helper functions", () => {
-  it("should throw if less than two segment", () => {
-    expect(() => {
-      targetFieldPathToParentPathAndSegment("a");
-    }).toThrow();
-    expect(configInvalidLogSpy).toHaveBeenCalled();
-  });
-
-  it("should return the parent path and segment path", () => {
-    const [simpleParentPath, simpleSegment] =
-      targetFieldPathToParentPathAndSegment("user.id");
-    expect(simpleParentPath).toEqual("user");
-    expect(simpleSegment).toEqual("id");
-
-    const [complexParentPath, complexSegment] =
-      targetFieldPathToParentPathAndSegment("users.{docId}.address.id");
-    expect(complexParentPath).toEqual("users.{docId}.address");
-    expect(complexSegment).toEqual("id");
-  });
-});
-
-describe("fieldPathsChanged helper functins", () => {
-  // Mock the change object
-  const changeMockFactory = (
-    beforeData: Record<string, unknown>,
-    afterData: Record<string, unknown>,
-  ) =>
-    ({
-      before: {
-        get: jest.fn().mockImplementation((path: string) => beforeData[path]),
-      },
-      after: {
-        get: jest.fn().mockImplementation((path: string) => afterData[path]),
-      },
-    }) as unknown as Change<QueryDocumentSnapshot>;
-
-  beforeAll(() => {
-    // @ts-ignore override mocked config with default values because this suite do not interact with firestore
-    config = getConfigFromEnv();
-  });
-
-  it("should return false if no fields changed", () => {
-    const beforeData = {
-      firstname: "John",
-      lastname: "Doe",
-    };
-    const afterData = {
-      firstname: "John",
-      lastname: "Doe",
-    };
-
-    const result = fieldPathsChanged(changeMockFactory(beforeData, afterData));
-
-    expect(result).toBeFalsy();
-  });
-
-  it("should return true if fields changed and logged change path", () => {
-    const beforeData = {
-      firstname: "John",
-      lastname: "Doe",
-    };
-    const afterData = {
-      firstname: "John",
-      lastname: "Smith",
-    };
-
-    const result = fieldPathsChanged(changeMockFactory(beforeData, afterData));
-
-    expect(result).toBeTruthy();
-    expect(sourceDocumentFieldChangedLogSpy).toHaveBeenCalledWith({
-      lastname: { before: "Doe", after: "Smith" },
-    });
-  });
 });
 
 describe("updateObject helper functions", () => {
@@ -180,8 +92,10 @@ describe("updateObject helper functions with user provided source denormalize fu
     // @ts-ignore override mocked config with default values because this suite do not interact with firestore
     config = {
       ...getConfigFromEnv(),
-      sourceCollectionName: "firestore-d13n-helpers-updateObject-sources",
-      targetCollectionNames: ["firestore-d13n-helpers-updateObject-targets"],
+      sourceCollectionName: "firestore-d13n-helpers-updateObjectCustom-sources",
+      targetCollectionNames: [
+        "firestore-d13n-helpers-updateObjectCustom-targets",
+      ],
       sourceDenormalizeFunctionName: "denormalizeUser",
       targetDocumentFields: ["user.id"],
     };
@@ -252,6 +166,41 @@ describe("updateObject helper functions with user provided source denormalize fu
 
     // Update completed log should be called
     expect(updateCompletedLogSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+// Cannot be implemented without mocking all firestore module
+// Might be possible if index in emulator are implemented, See https://github.com/firebase/firebase-tools/issues/2027
+describe.skip("updateObject helper functions with a wrong config", () => {
+  const db = getFirestore();
+
+  beforeAll(() => {
+    // @ts-ignore override mocked config with default values because this suite do not interact with firestore
+    config = {
+      ...getConfigFromEnv(),
+      sourceCollectionName: "firestore-d13n-helpers-updateObjectThrows-source",
+      targetCollectionNames: [
+        "firestore-d13n-helpers-updateObjectThrows-target",
+      ],
+      sourceDenormalizeFunctionName: undefined,
+      targetDocumentFields: ["user.id"],
+    };
+  });
+
+  afterAll(async () => {
+    // Clean up all documents
+    await Promise.all([
+      db.recursiveDelete(db.collection(config.sourceCollectionName)),
+    ]);
+  });
+
+  it("should throw", async () => {
+    // Setup source document wiht after data as it will be passed to the updateObject function
+    const sourceRef = db.collection(config.sourceCollectionName).doc();
+    await sourceRef.set({ test: true });
+    const sourceSnapshot = await sourceRef.get();
+
+    await updateObject(sourceSnapshot);
   });
 });
 
