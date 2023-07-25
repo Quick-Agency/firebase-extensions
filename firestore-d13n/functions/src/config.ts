@@ -1,10 +1,13 @@
 import { Config } from "./types";
 const config: Config = {
+  instanceId: process.env.EXT_INSTANCE_ID as string,
+  projectId: process.env.PROJECT_ID as string,
   location: process.env.LOCATION as string,
   sourceCollectionName: process.env.SOURCE_COLLECTION_NAME as string,
   sourceDocumentFields: process.env.SOURCE_DOCUMENT_FIELDS?.split(
     ",",
   ) as string[],
+  sourceDenormalizeFunctionName: process.env.SOURCE_DENORMALIZE_FUNCTION_NAME,
   targetCollectionNames: process.env.TARGET_COLLECTION_NAMES?.split(
     ",",
   ) as string[],
